@@ -1,0 +1,23 @@
+{
+  "_comment": "你的閱讀來源清單。要新增就照格式加一筆；enabled:false 會被跳過。name 會顯示在網頁上的分組標題。",
+  "sources": [
+    { "name": "The Economist — Latest", "url": "https://www.economist.com/latest/rss.xml", "enabled": true },
+    { "name": "The Economist — The World This Week", "url": "https://www.economist.com/the-world-this-week/rss.xml", "enabled": true },
+    { "name": "1843 Magazine", "url": "https://www.economist.com/1843/rss.xml", "enabled": true },
+    { "name": "The Atlantic", "url": "https://www.theatlantic.com/feed/all/", "enabled": true },
+    { "name": "Harper's Magazine", "url": "https://harpers.org/feed/", "enabled": true },
+    { "name": "London Review of Books", "url": "https://www.lrb.co.uk/feeds/rss", "enabled": true },
+    { "name": "n+1", "url": "https://www.nplusonemag.com/feed/", "enabled": true },
+    { "name": "Slow Boring (Matt Yglesias)", "url": "https://www.slowboring.com/feed", "enabled": true },
+    { "name": "Noahpinion (Noah Smith)", "url": "https://www.noahpinion.blog/feed", "enabled": true },
+    { "name": "Doomberg", "url": "https://doomberg.substack.com/feed", "enabled": true },
+    { "name": "Works in Progress", "url": "https://worksinprogress.substack.com/feed", "enabled": true },
+    { "name": "The Honest Broker (Ted Gioia)", "url": "https://www.honest-broker.com/feed", "enabled": true },
+    { "name": "Rest of World", "url": "https://restofworld.org/feed/latest/", "enabled": true },
+    { "name": "Semafor", "url": "https://www.semafor.com/rss.xml", "enabled": true },
+    { "name": "Politico", "url": "https://rss.politico.com/politics-news.xml", "enabled": true },
+    { "name": "The Wire China", "url": "https://www.thewirechina.com/feed/", "enabled": true },
+    { "name": "Quartz", "url": "https://qz.com/rss", "enabled": true },
+    { "name": "Foreign Affairs (無公開 feed，暫停用)", "url": "https://www.foreignaffairs.com/rss.xml", "enabled": false }
+  ]
+}

@@ -1,0 +1,61 @@
+name: Daily reading digest
+
+on:
+  schedule:
+    # 23:00 UTC = 隔天早上 07:00 台北時間。想改時間就改這行（用 UTC）。
+    - cron: "0 23 * * *"
+  workflow_dispatch: {}   # 也允許在 Actions 頁面手動觸發（用來測試）
+
+# 讓 workflow 能：把 seen.json/public 推回 repo、部署到 Pages
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# 同一時間只跑一份，避免 push 衝突
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Build digest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python aggregate.py
+
+      - name: Commit state & output back to repo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data public
+          if git diff --staged --quiet; then
+            echo "沒有變更，跳過 commit。"
+          else
+            git commit -m "digest: $(date -u +%Y-%m-%d)"
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
