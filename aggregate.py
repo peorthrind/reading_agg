@@ -31,7 +31,7 @@ ARCHIVE = PUBLIC / "archive"
 MODEL = "claude-haiku-4-5"          # 逐篇摘要用：便宜、夠用
 BRIEF_MODEL = "claude-sonnet-4-6"  # 每日精選/開場白用：一天一次，用聰明點的
 SEEN_RETENTION_DAYS = 60            # seen.json 只保留近 60 天，避免無限長大
-MAX_ITEMS_PER_SOURCE = 50          # 每個來源每次最多處理幾篇新文（防爆量的保險絲）
+MAX_ITEMS_PER_SOURCE = 75          # 每個來源每次最多處理幾篇新文（防爆量的保險絲）
 TZ = dt.timezone(dt.timedelta(hours=8))  # 台北時間，只用於顯示日期
 
 # 頁籤顯示順序。sources.json 裡沒對到這份清單的分類，會排在最後（歸到「其他」）。
