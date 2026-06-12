@@ -13,12 +13,14 @@ GitHub Actions (cron, 每天 23:00 UTC)
   python aggregate.py
         │
    ┌────┴─────────────────────────────────────┐
-   │ 1. 讀 sources.json（來源清單）             │
+   │ 1. 讀 sources.json（來源清單 + 分類）       │
    │ 2. feedparser 抓每個 RSS                   │
    │ 3. 跟 data/seen.json 比對 → 找出新文章      │
-   │ 4. 新文章丟給 Claude → 中英摘要             │
-   │ 5. 產生 public/index.html + archive/日期.html│
-   │ 6. 更新 data/seen.json                     │
+   │ 4. 新文章逐篇丟 Haiku → 中英摘要            │
+   │ 5. 全部新文丟 Sonnet → 開場白 + 今日精選     │
+   │ 6. 產生 HTML（分類頁籤 + 精選 + 深色切換）    │
+   │    public/index.html + archive/日期.html    │
+   │ 7. 更新 data/seen.json                     │
    └────┬─────────────────────────────────────┘
         │
    git commit data/ + public/ 回 repo
@@ -82,20 +84,38 @@ output_config={"format": {"type": "json_schema", "schema": SCHEMA}}
 - **為什麼**：我們要的是 `{en_summary, zh_title, zh_summary}` 三個欄位。用 structured output 把回應**約束成符合 schema 的 JSON**，API 層保證格式，省去「模型多嘴一句『以下是摘要：』害 json.loads 爆掉」的麻煩。
 - **單篇失敗不拖垮整批**：每篇摘要包在 try/except，失敗就用 feed 原摘要 fallback，繼續跑下一篇。批次工作的原則——**一顆壞掉的蛋不該毀掉整盤**。
 
-### (d) 模型選 Haiku
+### (d) 兩種模型，各司其職
 ```python
-MODEL = "claude-haiku-4-5"
+MODEL       = "claude-haiku-4-5"    # 逐篇摘要：高量、簡單 → 用便宜的
+BRIEF_MODEL = "claude-sonnet-4-6"   # 每日精選/開場白：一天一次 → 用聰明的
 ```
-- **為什麼**：摘要+翻譯是相對簡單、高量的任務，Haiku 便宜（$1/$5 per 1M tokens）又快，品質夠。估算月費幾毛~一美金。
-- 想更聰明（更精準的摘要）就改成 `claude-sonnet-4-6`，貴一點但仍便宜。這是一行就能調的旋鈕。
+- **為什麼分兩種**：逐篇摘要一天幾十~上百次，要便宜（Haiku $1/$5 per 1M），品質夠用。每日精選/開場白一天**只跑一次**、需要跨文章綜合判斷，值得用 Sonnet（$3/$15），多花約 2 美分/天。
+- **原則**：依「呼叫頻率 × 任務難度」分配模型，不是全用最貴或全用最便宜。高頻簡單用小模型、低頻關鍵用大模型。
 
 ### (e) 沒有 API key 也能跑（graceful degradation）
 `make_enricher()` 偵測不到 `ANTHROPIC_API_KEY` 時回傳 `None`，後續就用 feed 原摘要、跳過翻譯。
 - **為什麼**：本機隨手測、或 key 暫時有問題時，程式不該整個掛掉。**降級而非崩潰**是好的工程習慣。
 
 ### (f) 量的上限
-`MAX_ITEMS_PER_SOURCE = 15`：每個來源每次最多處理 15 篇新文。
-- **為什麼**：防爆量。萬一某來源一天灌了一堆，不會失控地呼叫 API。
+`MAX_ITEMS_PER_SOURCE = 50`：每個來源每次最多處理 50 篇新文。
+- **為什麼**：刻意**不做內容過濾**（使用方式是掃標題+摘要、想看才點，量不是問題）。上限純粹當「某 feed 突然灌 200 篇」的保險絲，設大一點（50）避免正常高量站被誤砍。
+- **截斷邏輯**：`new_entries[:N]` 取 feed 最前面 N 筆 = 保留最新的 N 篇；超過的會被標為已看、**永久跳過**（不是延到明天）。
+
+### (g) 分類頁籤
+- `sources.json` 每筆有 `category`；`render_page()` 依 `CATEGORY_ORDER` 把來源分組成頁籤。
+- 頁籤切換是**純前端 JS**（show/hide pane），一個 HTML 檔搞定，不需多頁面、不需後端。
+- 未對到 `CATEGORY_ORDER` 的分類會排到最後、歸到「其他」——所以亂填 category 不會讓文章消失，只是分組位置不同。
+
+### (h) 每日精選 + 開場白（generate_brief）
+- 把當天**所有**新文編號後一次丟給 Sonnet，用 structured output 回 `{intro, top5:[{index, reason}]}`。
+- **用 index 對應回文章**（而不是叫模型重打標題/連結）：模型只回編號，程式查表拿回正確的 title/link。**讓模型做判斷、程式做查表**，避免模型抄連結抄錯。
+- 防呆：種子模式 / 沒新文 / 沒 key / 失敗 → 回 `None`，頁面就不顯示精選區塊，其餘照常。
+
+### (i) 深色模式（純前端，零後端）
+- 配色用 CSS 變數；`:root[data-theme="dark"]` 覆寫變數，切換只是改 `<html>` 上的 `data-theme`。
+- **記憶**：選擇存 `localStorage`；沒選過就跟系統 `prefers-color-scheme` 走。
+- **防閃爍**：`<head>` 裡有一段在畫面繪製前就先設好 `data-theme` 的小腳本（否則會先閃一下淺色再變深色）。
+- 重點：這些都是**靜態頁面 + 瀏覽器端**就能做的事，不需要伺服器或資料庫——印證 §2「能用靜態檔解決就別架 server」。
 
 ---
 
@@ -145,10 +165,12 @@ concurrency:
 
 | 想做的事 | 改哪裡 |
 |---|---|
-| 加/移除來源 | `sources.json` |
-| 改摘要模型/品質 | `aggregate.py` 的 `MODEL` |
+| 加/移除來源、換來源的頁籤分類 | `sources.json`（`category` 欄） |
+| 改頁籤有哪些、順序 | `aggregate.py` 的 `CATEGORY_ORDER` |
+| 改逐篇摘要模型 | `aggregate.py` 的 `MODEL` |
+| 改每日精選/開場白模型或提示詞 | `aggregate.py` 的 `BRIEF_MODEL` / `generate_brief()` |
 | 改執行時間 | `digest.yml` 的 cron（記得用 UTC） |
-| 改網頁長相 | `aggregate.py` 的 `PAGE_CSS` 和 `render_page()` |
+| 改網頁長相、深色配色 | `aggregate.py` 的 `PAGE_CSS`（深色在 `[data-theme="dark"]`） |
 | 改每來源處理上限/保留天數 | `aggregate.py` 頂部的常數 |
 
 debug 時最快的方法：本機 `export ANTHROPIC_API_KEY=...` 然後直接 `python aggregate.py`，看 print 的逐來源訊息。

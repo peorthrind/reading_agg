@@ -1,6 +1,6 @@
 # reading_agg — 每日閱讀聚合器
 
-把一份你指定的 RSS 來源清單，每天早上彙整成一頁網頁：**按來源分組，每篇有標題、連結、一句中英對照摘要**。
+把一份你指定的 RSS 來源清單，每天早上彙整成一頁網頁：**依分類頁籤（科技/AI、新聞/時事、長文/評論）整理，每篇有標題、連結、一句中英對照摘要，頂部還有當天的「開場白 + 今日精選 Top 5」，並可切換深色模式**。
 跑在 GitHub Actions（免費排程）+ GitHub Pages（免費網頁），不靠你的電腦開機、手機電腦都能開同一個網址。
 
 只聚合各家**公開 RSS 的標題/摘要 metadata**，全文連回原站讀——不碰付費牆。
@@ -15,12 +15,13 @@
    ├─ 讀 sources.json 的來源，抓各家 RSS
    ├─ 跟 data/seen.json 比對，挑出「上次之後新增」的文章
    ├─ 每篇新文章 → Claude (Haiku) 產生 英文 summary + 中文標題/摘要
+   ├─ 當天所有新文 → Claude (Sonnet) 產生 開場白 + 今日精選 Top 5
    ├─ 輸出 public/index.html（最新）+ public/archive/日期.html（存檔）
    └─ commit 回 repo，並部署到 GitHub Pages
 ```
 
 - **第一次執行 = 種子模式**：只記錄目前各來源文章為基準線，不摘要、不花 token。隔天起才會出現「新增」內容。
-- **成本**：Haiku 計費，每天約幾十篇 × ~400 tokens，一個月大約 **幾毛到一美金**。想更聰明可在 `aggregate.py` 把 `MODEL` 改成 `claude-sonnet-4-6`。
+- **成本**：逐篇摘要用 Haiku（每天幾十篇 × ~400 tokens），每日精選用 Sonnet（一天一次，~2 美分）。合計一個月大約 **一兩美金**。模型可在 `aggregate.py` 的 `MODEL` / `BRIEF_MODEL` 調整。
 
 ---
 
@@ -95,7 +96,8 @@ open public/index.html                  # 打開看結果
 ## 之後可以加的東西
 
 - **Foreign Affairs / 其他沒 feed 的站**：架一個 RSSHub 幫它們生 feed，URL 填進 `sources.json`。
-- **AI 排序/精選**：在 digest 最上面加一段「今天最值得讀的 5 篇＋理由」。
+- **Email 每日推送**：除了網頁，每天寄一封 digest 到信箱。
+- **「已讀」標記**：點過的條目變灰（純前端 localStorage）。
 - **Email 推送**：除了網頁，每天寄一封 digest 到信箱。
 
 要做哪個再跟我說。

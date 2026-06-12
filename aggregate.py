@@ -28,7 +28,8 @@ SEEN_FILE = ROOT / "data" / "seen.json"
 PUBLIC = ROOT / "public"
 ARCHIVE = PUBLIC / "archive"
 
-MODEL = "claude-haiku-4-5"          # 便宜、夠用；想更聰明可改 claude-sonnet-4-6
+MODEL = "claude-haiku-4-5"          # 逐篇摘要用：便宜、夠用
+BRIEF_MODEL = "claude-sonnet-4-6"  # 每日精選/開場白用：一天一次，用聰明點的
 SEEN_RETENTION_DAYS = 60            # seen.json 只保留近 60 天，避免無限長大
 MAX_ITEMS_PER_SOURCE = 50          # 每個來源每次最多處理幾篇新文（防爆量的保險絲）
 TZ = dt.timezone(dt.timedelta(hours=8))  # 台北時間，只用於顯示日期
@@ -107,6 +108,79 @@ def make_enricher():
     return enrich
 
 
+# ---------------------------------------------------------------- 每日精選 + 開場白
+def generate_brief(groups: list[dict]) -> dict | None:
+    """把當天所有新文丟給模型，產出 {intro, picks:[{title,link,source,reason}]}。"""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return None
+    flat = [{**it, "source": g["name"]} for g in groups for it in g["items"]]
+    if not flat:
+        return None
+
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=api_key)
+    lines = []
+    for i, it in enumerate(flat):
+        t = it["zh_title"] or it["en_title"]
+        s = it["zh_summary"] or it["en_summary"] or ""
+        lines.append(f"[{i}] ({it['source']}) {t} — {s}")
+    n_pick = min(5, len(flat))
+    schema = {
+        "type": "object",
+        "properties": {
+            "intro": {"type": "string", "description": "2–3 句繁體中文開場白，綜述今天的大局"},
+            "top5": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "index": {"type": "integer", "description": "對應上面的文章編號"},
+                        "reason": {"type": "string", "description": "繁中一句，為什麼值得讀"},
+                    },
+                    "required": ["index", "reason"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["intro", "top5"],
+        "additionalProperties": False,
+    }
+    prompt = (
+        f"以下是今天新增的 {len(flat)} 篇文章（編號 (來源) 標題 — 摘要）。請用繁體中文：\n"
+        f"1. intro：寫 2–3 句『今天的大局』開場白，綜合最重要的脈絡，不要逐條流水帳。\n"
+        f"2. top5：挑出最值得讀的 {n_pick} 篇（給編號），每篇一句說明為什麼值得讀。"
+        f"偏好有觀點、有深度、跨主題的內容，盡量不要全挑同一個來源。\n\n"
+        + "\n".join(lines)
+    )
+    try:
+        resp = client.messages.create(
+            model=BRIEF_MODEL,
+            max_tokens=1500,
+            messages=[{"role": "user", "content": prompt}],
+            output_config={"format": {"type": "json_schema", "schema": schema}},
+        )
+        data = json.loads(next(b.text for b in resp.content if b.type == "text"))
+    except Exception as e:  # noqa: BLE001 — 失敗就不顯示精選，不影響其餘
+        print(f"   ! 今日精選產生失敗（{e.__class__.__name__}）")
+        return None
+
+    picks = []
+    for p in data.get("top5", [])[:5]:
+        i = p.get("index")
+        if isinstance(i, int) and 0 <= i < len(flat):
+            it = flat[i]
+            picks.append({
+                "title": it["zh_title"] or it["en_title"],
+                "link": it["link"],
+                "source": it["source"],
+                "reason": p.get("reason", ""),
+            })
+    print(f"✅ 今日精選：開場白 + {len(picks)} 篇")
+    return {"intro": data.get("intro", ""), "picks": picks}
+
+
 # ---------------------------------------------------------------- 主流程
 def load_seen() -> dict:
     if SEEN_FILE.exists():
@@ -172,12 +246,27 @@ def collect() -> tuple[list[dict], bool]:
 # ---------------------------------------------------------------- HTML 輸出
 PAGE_CSS = """
 :root { --bg:#faf8f3; --card:#fff; --ink:#222; --sub:#666; --line:#e7e2d6; --accent:#b5532e; }
+:root[data-theme="dark"] { --bg:#1a1a1a; --card:#242424; --ink:#e8e8e8; --sub:#9a9a9a; --line:#383838; --accent:#e0764a; }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--ink);
   font-family:-apple-system,"PingFang TC","Helvetica Neue",Arial,sans-serif; line-height:1.55; }
 .wrap { max-width:760px; margin:0 auto; padding:40px 20px 80px; }
+header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
 header h1 { font-size:1.5rem; margin:0 0 4px; }
 header .date { color:var(--sub); font-size:.95rem; }
+#theme-toggle { background:none; border:1px solid var(--line); border-radius:8px;
+  cursor:pointer; font-size:1.1rem; line-height:1; padding:8px 10px; color:var(--ink); flex:none; }
+#theme-toggle:hover { border-color:var(--accent); }
+.brief { background:var(--card); border:1px solid var(--line); border-left:3px solid var(--accent);
+  border-radius:10px; padding:16px 18px; margin-top:24px; }
+.brief .intro { margin:0 0 12px; font-size:1rem; }
+.brief h2 { font-size:.95rem; color:var(--accent); margin:0 0 8px; }
+.brief ol.picks { margin:0; padding-left:1.2em; }
+.brief ol.picks li { margin-bottom:10px; }
+.brief ol.picks a { color:var(--ink); font-weight:600; text-decoration:none; }
+.brief ol.picks a:hover { text-decoration:underline; }
+.brief .psrc { color:var(--sub); font-size:.82rem; margin-left:6px; }
+.brief .preason { color:var(--sub); font-size:.9rem; margin-top:2px; }
 .src { margin-top:36px; }
 .src h2 { font-size:1.05rem; border-bottom:2px solid var(--accent); padding-bottom:6px;
   margin:0 0 14px; color:var(--accent); }
@@ -221,6 +310,20 @@ document.querySelectorAll('.tabs button').forEach(function(btn){
 </script>
 """
 
+THEME_JS = """
+<script>
+(function(){
+  var tt=document.getElementById('theme-toggle');
+  if(!tt)return;
+  tt.addEventListener('click',function(){
+    var next=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+    document.documentElement.setAttribute('data-theme',next);
+    try{localStorage.setItem('theme',next);}catch(e){}
+  });
+})();
+</script>
+"""
+
 
 def esc(s: str) -> str:
     return html.escape(s or "")
@@ -255,11 +358,32 @@ def order_categories(buckets: dict) -> list[str]:
     return ordered
 
 
-def render_page(groups: list[dict], date: str, archive_links: list[str], seed_mode: bool) -> str:
+def render_brief(brief: dict | None) -> str:
+    if not brief or not brief.get("picks"):
+        return ""
+    out = ['<section class="brief">']
+    if brief.get("intro"):
+        out.append(f'<p class="intro">{esc(brief["intro"])}</p>')
+    out.append('<h2>今日精選</h2><ol class="picks">')
+    for p in brief["picks"]:
+        out.append(f'<li><a href="{esc(p["link"])}" target="_blank" rel="noopener">{esc(p["title"])}</a>'
+                   f'<span class="psrc">{esc(p["source"])}</span>'
+                   f'<div class="preason">{esc(p["reason"])}</div></li>')
+    out.append('</ol></section>')
+    return "".join(out)
+
+
+def render_page(groups: list[dict], date: str, archive_links: list[str],
+                seed_mode: bool, brief: dict | None = None) -> str:
     parts = [f"""<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>晨間閱讀 · {date}</title><style>{PAGE_CSS}</style></head><body><div class="wrap">
-<header><h1>📰 晨間閱讀</h1><div class="date">{date}</div></header>"""]
+<title>晨間閱讀 · {date}</title><style>{PAGE_CSS}</style>
+<script>(function(){{try{{var t=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}}catch(e){{}}}})();</script>
+</head><body><div class="wrap">
+<header><div><h1>📰 晨間閱讀</h1><div class="date">{date}</div></div>
+<button id="theme-toggle" aria-label="切換深淺色" title="切換深淺色">🌓</button></header>"""]
+
+    parts.append(render_brief(brief))
 
     has_tabs = False
     if seed_mode:
@@ -298,18 +422,19 @@ def render_page(groups: list[dict], date: str, archive_links: list[str], seed_mo
     parts.append('</div>')
     if has_tabs:
         parts.append(TAB_JS)
+    parts.append(THEME_JS)
     parts.append('</body></html>')
     return "".join(parts)
 
 
-def write_outputs(groups: list[dict], seed_mode: bool):
+def write_outputs(groups: list[dict], seed_mode: bool, brief: dict | None = None):
     date = today_str()
     ARCHIVE.mkdir(parents=True, exist_ok=True)
 
     # 非種子模式才存當天的存檔
     if not seed_mode:
         (ARCHIVE / f"{date}.html").write_text(
-            render_page(groups, date, [], seed_mode), encoding="utf-8")
+            render_page(groups, date, [], seed_mode, brief), encoding="utf-8")
 
     # 蒐集所有存檔日期（倒序）給首頁底部連結
     archive_dates = sorted(
@@ -318,10 +443,11 @@ def write_outputs(groups: list[dict], seed_mode: bool):
     )
     PUBLIC.mkdir(parents=True, exist_ok=True)
     (PUBLIC / "index.html").write_text(
-        render_page(groups, date, archive_dates, seed_mode), encoding="utf-8")
+        render_page(groups, date, archive_dates, seed_mode, brief), encoding="utf-8")
     print(f"✅ 已寫出 public/index.html（{date}）")
 
 
 if __name__ == "__main__":
     groups, seed_mode = collect()
-    write_outputs(groups, seed_mode)
+    brief = None if seed_mode else generate_brief(groups)
+    write_outputs(groups, seed_mode, brief)
