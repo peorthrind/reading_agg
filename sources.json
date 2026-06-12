@@ -16,8 +16,10 @@
     { "name": "Rest of World", "url": "https://restofworld.org/feed/latest/", "enabled": true },
     { "name": "Semafor", "url": "https://www.semafor.com/rss.xml", "enabled": true },
     { "name": "Politico", "url": "https://rss.politico.com/politics-news.xml", "enabled": true },
+    { "name": "Politico Europe", "url": "https://www.politico.eu/feed/", "enabled": true },
     { "name": "The Wire China", "url": "https://www.thewirechina.com/feed/", "enabled": true },
     { "name": "Quartz", "url": "https://qz.com/rss", "enabled": true },
-    { "name": "Foreign Affairs (無公開 feed，暫停用)", "url": "https://www.foreignaffairs.com/rss.xml", "enabled": false }
+    { "name": "Delayed Gratification", "url": "https://www.slow-journalism.com/feed/", "enabled": true },
+    { "name": "Foreign Affairs (via Google News)", "url": "https://news.google.com/rss/search?q=site:foreignaffairs.com+when:14d&hl=en-US&gl=US&ceid=US:en", "enabled": true }
   ]
 }
