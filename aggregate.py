@@ -30,8 +30,12 @@ ARCHIVE = PUBLIC / "archive"
 
 MODEL = "claude-haiku-4-5"          # 便宜、夠用；想更聰明可改 claude-sonnet-4-6
 SEEN_RETENTION_DAYS = 60            # seen.json 只保留近 60 天，避免無限長大
-MAX_ITEMS_PER_SOURCE = 15          # 每個來源每次最多處理幾篇新文（防爆量）
+MAX_ITEMS_PER_SOURCE = 50          # 每個來源每次最多處理幾篇新文（防爆量的保險絲）
 TZ = dt.timezone(dt.timedelta(hours=8))  # 台北時間，只用於顯示日期
+
+# 頁籤顯示順序。sources.json 裡沒對到這份清單的分類，會排在最後（歸到「其他」）。
+CATEGORY_ORDER = ["科技 / AI", "新聞 / 時事", "長文 / 評論"]
+DEFAULT_CATEGORY = "其他"
 
 
 # ---------------------------------------------------------------- 工具
@@ -155,7 +159,11 @@ def collect() -> tuple[list[dict], bool]:
             })
         if items:
             print(f"   新增 {len(items)} 篇。")
-            groups.append({"name": src["name"], "items": items})
+            groups.append({
+                "name": src["name"],
+                "category": src.get("category", DEFAULT_CATEGORY),
+                "items": items,
+            })
 
     save_seen(seen)
     return groups, seed_mode
@@ -183,14 +191,68 @@ header .date { color:var(--sub); font-size:.95rem; }
 .item .sum .zh-s { color:var(--ink); }
 .item .sum .en-s { color:var(--sub); font-style:italic; margin-top:2px; }
 .empty { color:var(--sub); margin-top:30px; }
+.tabs { display:flex; gap:8px; flex-wrap:wrap; margin-top:24px;
+  border-bottom:1px solid var(--line); }
+.tabs button { background:none; border:none; padding:10px 14px; cursor:pointer;
+  font:inherit; color:var(--sub); border-bottom:2px solid transparent;
+  margin-bottom:-1px; }
+.tabs button:hover { color:var(--ink); }
+.tabs button.active { color:var(--accent); border-bottom-color:var(--accent);
+  font-weight:600; }
+.tabs button .count { color:var(--sub); font-weight:400; font-size:.85em; }
+.pane { display:none; }
+.pane.active { display:block; }
 footer { margin-top:50px; padding-top:16px; border-top:1px solid var(--line);
   color:var(--sub); font-size:.85rem; }
 footer a { color:var(--accent); }
 """
 
+TAB_JS = """
+<script>
+document.querySelectorAll('.tabs button').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var cat = btn.dataset.cat;
+    document.querySelectorAll('.tabs button').forEach(function(b){
+      b.classList.toggle('active', b===btn); });
+    document.querySelectorAll('.pane').forEach(function(p){
+      p.classList.toggle('active', p.dataset.cat===cat); });
+  });
+});
+</script>
+"""
+
 
 def esc(s: str) -> str:
     return html.escape(s or "")
+
+
+def render_item(it: dict) -> str:
+    zh_t = esc(it["zh_title"]) or esc(it["en_title"])
+    out = [f'<div class="item"><a class="t" href="{esc(it["link"])}" target="_blank" rel="noopener">'
+           f'<div class="zh">{zh_t}</div>']
+    if it["zh_title"]:
+        out.append(f'<div class="en">{esc(it["en_title"])}</div>')
+    out.append('</a><div class="sum">')
+    if it["zh_summary"]:
+        out.append(f'<div class="zh-s">{esc(it["zh_summary"])}</div>')
+    if it["en_summary"]:
+        out.append(f'<div class="en-s">{esc(it["en_summary"])}</div>')
+    out.append('</div></div>')
+    return "".join(out)
+
+
+def render_source_section(g: dict) -> str:
+    body = "".join(render_item(it) for it in g["items"])
+    return f'<section class="src"><h2>{esc(g["name"])}</h2>{body}</section>'
+
+
+def order_categories(buckets: dict) -> list[str]:
+    """CATEGORY_ORDER 優先，未列出的分類接在後面，「其他」墊底。"""
+    ordered = [c for c in CATEGORY_ORDER if c in buckets]
+    ordered += [c for c in buckets if c not in CATEGORY_ORDER and c != DEFAULT_CATEGORY]
+    if DEFAULT_CATEGORY in buckets:
+        ordered.append(DEFAULT_CATEGORY)
+    return ordered
 
 
 def render_page(groups: list[dict], date: str, archive_links: list[str], seed_mode: bool) -> str:
@@ -199,28 +261,33 @@ def render_page(groups: list[dict], date: str, archive_links: list[str], seed_mo
 <title>晨間閱讀 · {date}</title><style>{PAGE_CSS}</style></head><body><div class="wrap">
 <header><h1>📰 晨間閱讀</h1><div class="date">{date}</div></header>"""]
 
+    has_tabs = False
     if seed_mode:
         parts.append('<p class="empty">已完成初始化：記錄了目前各來源的文章為基準線。'
                      '從明天起，這裡會顯示「昨天之後新增」的內容。</p>')
     elif not groups:
         parts.append('<p class="empty">昨天沒有新內容。😌</p>')
     else:
+        has_tabs = True
+        buckets: dict[str, list[dict]] = {}
         for g in groups:
-            parts.append(f'<section class="src"><h2>{esc(g["name"])}</h2>')
-            for it in g["items"]:
-                zh_t = esc(it["zh_title"]) or esc(it["en_title"])
-                en_t = esc(it["en_title"])
-                parts.append(f'<div class="item"><a class="t" href="{esc(it["link"])}" target="_blank" rel="noopener">'
-                             f'<div class="zh">{zh_t}</div>')
-                if it["zh_title"]:
-                    parts.append(f'<div class="en">{en_t}</div>')
-                parts.append('</a><div class="sum">')
-                if it["zh_summary"]:
-                    parts.append(f'<div class="zh-s">{esc(it["zh_summary"])}</div>')
-                if it["en_summary"]:
-                    parts.append(f'<div class="en-s">{esc(it["en_summary"])}</div>')
-                parts.append('</div></div>')
-            parts.append('</section>')
+            buckets.setdefault(g["category"], []).append(g)
+        ordered = order_categories(buckets)
+
+        tabs = ['<div class="tabs">']
+        for i, cat in enumerate(ordered):
+            cnt = sum(len(g["items"]) for g in buckets[cat])
+            cls = "active" if i == 0 else ""
+            tabs.append(f'<button class="{cls}" data-cat="{esc(cat)}">'
+                        f'{esc(cat)} <span class="count">({cnt})</span></button>')
+        tabs.append('</div>')
+        parts.append("".join(tabs))
+
+        for i, cat in enumerate(ordered):
+            cls = "pane active" if i == 0 else "pane"
+            parts.append(f'<div class="{cls}" data-cat="{esc(cat)}">')
+            parts.extend(render_source_section(g) for g in buckets[cat])
+            parts.append('</div>')
 
     if archive_links:
         links = " · ".join(f'<a href="archive/{d}.html">{d}</a>' for d in archive_links[:30])
@@ -228,7 +295,10 @@ def render_page(groups: list[dict], date: str, archive_links: list[str], seed_mo
     else:
         parts.append('<footer>由 reading_agg 自動產生。</footer>')
 
-    parts.append('</div></body></html>')
+    parts.append('</div>')
+    if has_tabs:
+        parts.append(TAB_JS)
+    parts.append('</body></html>')
     return "".join(parts)
 
 
