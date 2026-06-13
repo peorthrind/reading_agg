@@ -9,8 +9,9 @@
 - [x] GitHub Actions 每日排程 + Pages 部署
 - [x] 種子模式、無 key 降級、單篇失敗容錯、量上限、seen 保留期
 - [x] **分類頁籤**：3 類（科技/AI、新聞/時事、長文/評論），上方頁籤切換、各帶數量、純 JS。分類由 `sources.json` 的 `category` 欄決定。
-- [x] **擴充科技/AI 來源**：TechCrunch、MIT Tech Review、MarkTechPost、INSIDE、36氪、Hacker News。
-- [x] **每來源上限調為 75**：決定不做內容過濾（使用方式是掃標題+摘要、想看才點），上限只當「feed 暴衝」保險絲。原為 50，因 Economist 週四印刷版單日逼近 50（45→49→50），為留容錯邊際拉到 75。
+- [x] **擴充科技/AI 來源**：TechCrunch、MIT Tech Review、MarkTechPost、INSIDE、36氪、Hacker News。後加中文 AI：量子位、InfoQ 中文（科技/AI）、阮一峰週刊（長文/評論，每週一篇）。
+- [x] **每來源上限調為 75**：預設不做內容過濾（使用方式是掃標題+摘要、想看才點），上限只當「feed 暴衝」保險絲。原為 50，因 Economist 週四印刷版單日逼近 50（45→49→50），為留容錯邊際拉到 75。
+- [x] **per-source `include_link_substr` 過濾**（按連結結構的零成本硬篩，跑在上限+摘要之前）：36氪只留深度文 `/p/`、丟掉快訊 `/newsflashes/`。注意機器之心/新智元/智東西等中文 AI 媒體 RSS 已收進付費牆或只在微信，拿不到公開 feed。
 - [x] **每日精選 + 開場白**：跨來源綜合，頂部一段「今天的大局」+ Top 5（含理由/連結），用 Sonnet 一天一次（~2 美分/天）。
 - [x] **深色模式**：頂部按鈕切換，localStorage 記憶、跟系統預設走、防閃爍；純前端零成本。
 
@@ -23,7 +24,7 @@
 - [ ] **Delayed Gratification feed 含非文章內容**（每週小測驗、audio），可加關鍵字/分類過濾。
 - [ ] 其他沒 feed 的站，同樣用「先找隱藏 feed → 退 Google News RSS」的順序處理。RSSHub（需自架 server）留作要高品質時的選項。
 - [ ] **付費 Substack 全文私人 feed**：目前抓的是公開 feed（摘要可能被截斷）。已訂閱的 Substack 可在帳號設定拿到「私人全文 RSS」，換上去摘要品質更好。注意：私人 feed URL 含密鑰，不能放進 public repo 的 `sources.json`——要改成從 Secret 讀。
-- [ ] **更精準的「文章 vs 雜訊」過濾**：有些 feed（如 Economist 的 indicators、Quartz）會混進資料表、行情頁這類非文章內容，可加關鍵字/分類過濾。
+- [~] **更精準的「文章 vs 雜訊」過濾**：URL 有規律的雜訊已可用 `include_link_substr` 解（如 36氪快訊）。剩下沒解的是「URL 無規律」的雜訊——有些 feed（如 Economist 的 indicators、Quartz）會混進資料表、行情頁，那種要靠關鍵字或分類/打分才砍得掉。
 
 ## 摘要品質
 
