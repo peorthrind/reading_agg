@@ -218,6 +218,16 @@ def collect() -> tuple[list[dict], bool]:
             print(f"   種子模式：記錄 {len(feed.entries)} 篇為已看，不摘要。")
             continue
 
+        # 來源層級過濾：只保留連結含 include_link_substr 的文章。
+        # 例：36氪 feed 把深度文(/p/)和快訊(/newsflashes/)混在一起，
+        # 設成 "36kr.com/p/" 就只留深度長文、丟掉快訊。
+        # 這一步刻意放在 per-source limit 與 Claude 摘要之前，避免名額被快訊吃掉、也不浪費 token。
+        keep = src.get("include_link_substr")
+        if keep:
+            before = len(new_entries)
+            new_entries = [e for e in new_entries if keep in getattr(e, "link", "")]
+            print(f"   過濾 include_link_substr={keep!r}：{before} → {len(new_entries)} 篇")
+
         items = []
         for e in new_entries[:MAX_ITEMS_PER_SOURCE]:
             title = clean_text(getattr(e, "title", ""), 300)
