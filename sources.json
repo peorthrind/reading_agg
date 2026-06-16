@@ -10,7 +10,7 @@
     { "name": "InfoQ 中文", "category": "科技 / AI", "url": "https://www.infoq.cn/feed", "enabled": true },
     { "name": "Hacker News 首頁", "category": "科技 / AI", "url": "https://hnrss.org/frontpage", "enabled": true },
     { "name": "Rest of World", "category": "科技 / AI", "url": "https://restofworld.org/feed/latest/", "enabled": true },
-    { "name": "Quartz", "category": "科技 / AI", "url": "https://qz.com/rss", "enabled": true },
+    { "name": "Quartz", "category": "科技 / AI", "url": "https://qz.com/rss", "enabled": false },
 
     { "name": "The Economist — Latest", "category": "新聞 / 時事", "url": "https://www.economist.com/latest/rss.xml", "enabled": true },
     { "name": "The Economist — The World This Week", "category": "新聞 / 時事", "url": "https://www.economist.com/the-world-this-week/rss.xml", "enabled": true },
