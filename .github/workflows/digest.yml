@@ -42,11 +42,13 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data public
+          git add data public inbox processed
           if git diff --staged --quiet; then
             echo "沒有變更，跳過 commit。"
           else
             git commit -m "digest: $(date -u +%Y-%m-%d)"
+            # 攝取端 bot 也會 push inbox 檔到 main，push 前先 rebase 避免非快轉衝突。
+            git pull --rebase
             git push
           fi
 

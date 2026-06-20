@@ -17,6 +17,9 @@
 
 ---
 
+## 手動來源管道（Discord → 全文 → 長摘要）
+- [x] **手動丟連結的精讀管道（後半段，本 repo）**：把 Discord 收到的文章/影片連結煮成全文，每天 7 點併進 digest 做長摘要 + 重點整理。攝取端（Discord→純文字）拆到另一個 repo；本 repo `aggregate.py` 已實作 `collect_inbox()` → Sonnet 長摘要 → 「自選內容」頁籤長卡片 → 搬到 `processed/`。完整規格與實作狀態見 [`todo_inbox_processing.md`](todo_inbox_processing.md)（前半段交接文件 `ingestion_handoff.md`）。真實 Sonnet 呼叫待 Action 首次跑驗證。
+
 ## 內容覆蓋
 
 - [x] **補上沒有 feed 的來源**：Politico Europe、Delayed Gratification 找到官方 feed 直接加；Foreign Affairs 無官方 feed，改用 **Google News RSS**（`site:` 查詢）。

@@ -30,12 +30,23 @@ ARCHIVE = PUBLIC / "archive"
 
 MODEL = "claude-haiku-4-5"          # 逐篇摘要用：便宜、夠用
 BRIEF_MODEL = "claude-sonnet-4-6"  # 每日精選/開場白用：一天一次，用聰明點的
+LONG_MODEL = "claude-sonnet-4-6"   # 自選內容長摘要用：吃全文，產結構化長摘要
 SEEN_RETENTION_DAYS = 60            # seen.json 只保留近 60 天，避免無限長大
 MAX_ITEMS_PER_SOURCE = 75          # 每個來源每次最多處理幾篇新文（防爆量的保險絲）
+LONG_TEXT_CHAR_CAP = 40000          # 自選內容 full_text 字數上限（成本保險絲）：
+                                    # 中文最壞約 1 token/字，故 40000 字 ≈ ≤40k token ≈ ≤$0.12 input，與語言無關的上界。
 TZ = dt.timezone(dt.timedelta(hours=8))  # 台北時間，只用於顯示日期
 
-# 頁籤顯示順序。sources.json 裡沒對到這份清單的分類，會排在最後（歸到「其他」）。
-CATEGORY_ORDER = ["科技 / AI", "新聞 / 時事", "長文 / 評論"]
+# 自選內容（手動丟連結→長摘要）相關路徑與設定
+INBOX_DIR = ROOT / "inbox"
+PROCESSED_DIR = ROOT / "processed"
+INBOX_SEEN_FILE = ROOT / "data" / "inbox_seen.json"
+INBOX_SCHEMA_VERSION = 1
+INBOX_CATEGORY = "自選內容"
+
+# 頁籤顯示順序。「自選內容」排第一（手動精選）；其餘對應 sources.json 的 category。
+# 沒對到這份清單的分類，會排在最後（歸到「其他」）。
+CATEGORY_ORDER = [INBOX_CATEGORY, "科技 / AI", "新聞 / 時事", "長文 / 評論"]
 DEFAULT_CATEGORY = "其他"
 
 
@@ -106,6 +117,72 @@ def make_enricher():
             return None
 
     return enrich
+
+
+# ---------------------------------------------------------------- 自選內容長摘要
+def make_long_enricher():
+    """回傳 enrich_long(inbox_item) -> dict | None。沒有 key 就回 None（=不做長摘要）。"""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return None
+
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=api_key)
+    schema = {
+        "type": "object",
+        "properties": {
+            "zh_title": {"type": "string", "description": "繁體中文標題"},
+            "one_liner": {"type": "string", "description": "一句話：這篇／這片在講什麼"},
+            "key_points": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "幾個重點，每點含具體內容（論點／數據／例子），不是只寫話題",
+            },
+            "summary": {"type": "string", "description":
+                "依原文約 1/5 長度的繁中長摘要；原文很長時用分主題小節（段落以空行分隔），"
+                "保留具體論點、數據、例子與結論，不是逐段翻譯也不是一句帶過"},
+            "worth_reading": {"type": "string", "description": "一句：為什麼值得花時間讀全文／看全片"},
+        },
+        "required": ["zh_title", "one_liner", "key_points", "summary", "worth_reading"],
+        "additionalProperties": False,
+    }
+
+    def enrich_long(item: dict) -> dict | None:
+        text = item.get("full_text") or ""
+        truncated = len(text) > LONG_TEXT_CHAR_CAP
+        if truncated:
+            text = text[:LONG_TEXT_CHAR_CAP]
+        kind = "影片逐字稿" if item.get("type") == "youtube" else "文章正文"
+        note = item.get("note") or ""
+        prompt = (
+            "你在為一份個人精讀摘要做『深度筆記』，讀者是丟這篇連結進來的人本人，"
+            "目的是讓他不必讀完全文／看完整片，也能真正吸收裡面的論點與資訊。請用繁體中文。\n\n"
+            f"來源類型：{kind}\n"
+            f"標題：{item.get('title', '')}\n"
+            f"來源：{item.get('source', '')}\n"
+            + (f"附註（丟連結時的側重提示）：{note}\n" if note else "")
+            + "\n要求：\n"
+            "1. 不是逐段翻譯，也不是一句話帶過。保留具體的論點、數據、例子、人名與結論——"
+            "寧可長一點，也不要把內容壓成只剩主題句。\n"
+            "2. summary 本體長度抓在原文的 1/5 左右；原文很長時改用分主題小節呈現（段落用空行分隔）。\n"
+            + ("（注意：以下內容已截斷，只涵蓋前段，請在 summary 結尾註明「（基於前段內容）」。）\n"
+               if truncated else "")
+            + f"\n以下是{kind}：\n{text}"
+        )
+        try:
+            resp = client.messages.create(
+                model=LONG_MODEL,
+                max_tokens=8000,
+                messages=[{"role": "user", "content": prompt}],
+                output_config={"format": {"type": "json_schema", "schema": schema}},
+            )
+            return json.loads(next(b.text for b in resp.content if b.type == "text"))
+        except Exception as e:  # noqa: BLE001 — 單篇失敗不該讓整批掛掉
+            print(f"   ! 長摘要失敗（{e.__class__.__name__}），這篇留著下次再試。")
+            return None
+
+    return enrich_long
 
 
 # ---------------------------------------------------------------- 每日精選 + 開場白
@@ -195,6 +272,19 @@ def save_seen(seen: dict):
     SEEN_FILE.write_text(json.dumps(pruned, ensure_ascii=False, indent=0), encoding="utf-8")
 
 
+def load_inbox_seen() -> dict:
+    if INBOX_SEEN_FILE.exists():
+        return json.loads(INBOX_SEEN_FILE.read_text(encoding="utf-8"))
+    return {}
+
+
+def save_inbox_seen(seen: dict):
+    cutoff = (dt.datetime.now(TZ) - dt.timedelta(days=SEEN_RETENTION_DAYS)).strftime("%Y-%m-%d")
+    pruned = {k: v for k, v in seen.items() if v >= cutoff}
+    INBOX_SEEN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    INBOX_SEEN_FILE.write_text(json.dumps(pruned, ensure_ascii=False, indent=0), encoding="utf-8")
+
+
 def collect() -> tuple[list[dict], bool]:
     """回傳 (按來源分組的新文章, 是否為種子模式)。"""
     sources = json.loads(SOURCES_FILE.read_text(encoding="utf-8"))["sources"]
@@ -253,6 +343,99 @@ def collect() -> tuple[list[dict], bool]:
     return groups, seed_mode
 
 
+def collect_inbox() -> tuple[dict | None, list[tuple]]:
+    """讀 inbox/*.json → 每篇 Sonnet 長摘要 → 包成一個『自選內容』group。
+    回傳 (group 或 None, 要搬走的檔清單 [(path, id), ...])。
+    開跑當下 glob 一次、只處理這批；跑到一半若有新檔進來，留到下次（見 docs 競態說明）。
+    """
+    if not INBOX_DIR.exists():
+        return None, []
+    paths = sorted(INBOX_DIR.glob("*.json"))
+    if not paths:
+        return None, []
+
+    enrich_long = make_long_enricher()
+    if enrich_long is None:
+        print("⚠️  沒有 ANTHROPIC_API_KEY，跳過自選內容長摘要。")
+        return None, []
+
+    seen = load_inbox_seen()
+    required = ("id", "url", "type", "title", "source", "full_text")
+    items, processed = [], []
+    for p in paths:
+        try:
+            d = json.loads(p.read_text(encoding="utf-8"))
+        except Exception as e:  # noqa: BLE001
+            print(f"   ! 讀不了 {p.name}（{e.__class__.__name__}），跳過。")
+            continue
+        if d.get("schema_version") != INBOX_SCHEMA_VERSION:
+            print(f"   ! {p.name} schema_version 非 {INBOX_SCHEMA_VERSION}，跳過。")
+            continue
+        if not all(d.get(k) for k in required):
+            print(f"   ! {p.name} 缺必要欄位，跳過。")
+            continue
+        iid = d["id"]
+        if iid in seen:
+            # 跨天去重保險：已處理過卻還在 inbox（上次沒搬成功），這次補搬、不重做摘要。
+            print(f"   · {p.name} 已處理過，補搬到 processed/。")
+            processed.append((p, iid))
+            continue
+
+        print(f"→ 自選內容：{d['title'][:40]}")
+        enriched = enrich_long(d)
+        if not enriched:
+            continue  # 失敗就留著（不搬、不記 seen），下次再試
+        meta = d.get("meta") or {}
+        items.append({
+            # generate_brief 相容欄位（讓自選內容也能被選進今日精選）
+            "en_title": d["title"],
+            "zh_title": enriched.get("zh_title", ""),
+            "zh_summary": enriched.get("one_liner", ""),
+            "en_summary": "",
+            "link": d["url"],
+            # 長卡片專用欄位
+            "source": d["source"],
+            "type": d["type"],
+            "one_liner": enriched.get("one_liner", ""),
+            "key_points": enriched.get("key_points", []),
+            "summary": enriched.get("summary", ""),
+            "worth_reading": enriched.get("worth_reading", ""),
+            "duration_seconds": meta.get("duration_seconds"),
+            "word_count": meta.get("word_count"),
+        })
+        processed.append((p, iid))
+
+    if not items:
+        return None, processed
+
+    print(f"✅ 自選內容：{len(items)} 篇長摘要")
+    group = {"name": INBOX_CATEGORY, "category": INBOX_CATEGORY, "long": True, "items": items}
+    return group, processed
+
+
+def archive_processed_inbox(processed: list[tuple]):
+    """把處理過的 inbox 檔搬到 processed/<日期>/（保留原檔備查），並把 id 記進 inbox_seen.json。"""
+    if not processed:
+        return
+    date = today_str()
+    dest = PROCESSED_DIR / date
+    dest.mkdir(parents=True, exist_ok=True)
+    seen = load_inbox_seen()
+    moved = 0
+    for p, iid in processed:
+        if not p.exists():
+            continue
+        try:
+            p.replace(dest / p.name)   # 同 repo 同檔系搬移
+            seen[iid] = date
+            moved += 1
+        except OSError as e:
+            print(f"   ! 搬移 {p.name} 失敗（{e.__class__.__name__}）。")
+    save_inbox_seen(seen)
+    if moved:
+        print(f"✅ 已搬移 {moved} 個 inbox 檔到 processed/{date}/")
+
+
 # ---------------------------------------------------------------- HTML 輸出
 PAGE_CSS = """
 :root { --bg:#faf8f3; --card:#fff; --ink:#222; --sub:#666; --line:#e7e2d6; --accent:#b5532e; }
@@ -304,6 +487,21 @@ header .date { color:var(--sub); font-size:.95rem; }
 footer { margin-top:50px; padding-top:16px; border-top:1px solid var(--line);
   color:var(--sub); font-size:.85rem; }
 footer a { color:var(--accent); }
+/* 自選內容長卡片：沿用卡片風格，加左側 accent 條、更厚的內距、結構化內文 */
+.longsec { margin-top:24px; }
+.longitem { background:var(--card); border:1px solid var(--line); border-left:3px solid var(--accent);
+  border-radius:10px; padding:18px 20px; margin-bottom:20px; }
+.longitem .lt-head a { text-decoration:none; color:var(--ink); }
+.longitem .lt-title { font-weight:600; font-size:1.12rem; line-height:1.4; }
+.longitem .lt-head a:hover .lt-title { text-decoration:underline; }
+.longitem .lt-meta { color:var(--sub); font-size:.85rem; margin-top:4px; }
+.longitem .lt-oneliner { font-size:1rem; margin:12px 0 0; }
+.longitem .lt-points { margin:12px 0 0; padding-left:1.2em; }
+.longitem .lt-points li { margin-bottom:5px; }
+.longitem .lt-summary { margin-top:6px; }
+.longitem .lt-summary p { margin:10px 0; font-size:.95rem; }
+.longitem .lt-worth { margin-top:14px; padding-top:12px; border-top:1px solid var(--line);
+  font-size:.92rem; color:var(--sub); }
 """
 
 TAB_JS = """
@@ -357,6 +555,40 @@ def render_item(it: dict) -> str:
 def render_source_section(g: dict) -> str:
     body = "".join(render_item(it) for it in g["items"])
     return f'<section class="src"><h2>{esc(g["name"])}</h2>{body}</section>'
+
+
+def render_long_item(it: dict) -> str:
+    """自選內容的長卡片：圖示＋標題＋來源/時長 meta → 引言 → 重點清單 → 多段摘要 → 收尾。"""
+    zh_t = esc(it["zh_title"]) or esc(it["en_title"])
+    icon = "📺" if it.get("type") == "youtube" else "📄"
+    meta_bits = [esc(it.get("source", ""))]
+    dur, wc = it.get("duration_seconds"), it.get("word_count")
+    if isinstance(dur, int) and dur > 0:
+        meta_bits.append(f"{round(dur / 60)} 分鐘")
+    elif isinstance(wc, int) and wc > 0:
+        meta_bits.append(f"{wc} 字")
+    meta = " · ".join(b for b in meta_bits if b)
+
+    out = [f'<div class="longitem"><div class="lt-head">'
+           f'<a href="{esc(it["link"])}" target="_blank" rel="noopener">'
+           f'<div class="lt-title">{icon} {zh_t}</div></a>'
+           f'<div class="lt-meta">{meta}</div></div>']
+    if it.get("one_liner"):
+        out.append(f'<div class="lt-oneliner">{esc(it["one_liner"])}</div>')
+    pts = [p for p in (it.get("key_points") or []) if p]
+    if pts:
+        out.append('<ul class="lt-points">')
+        out.extend(f'<li>{esc(p)}</li>' for p in pts)
+        out.append('</ul>')
+    if it.get("summary"):
+        paras = [seg.strip() for seg in re.split(r"\n\s*\n", it["summary"]) if seg.strip()]
+        out.append('<div class="lt-summary">')
+        out.extend(f'<p>{esc(para)}</p>' for para in paras)
+        out.append('</div>')
+    if it.get("worth_reading"):
+        out.append(f'<div class="lt-worth">💡 值得讀：{esc(it["worth_reading"])}</div>')
+    out.append('</div>')
+    return "".join(out)
 
 
 def order_categories(buckets: dict) -> list[str]:
@@ -420,7 +652,14 @@ def render_page(groups: list[dict], date: str, archive_links: list[str],
         for i, cat in enumerate(ordered):
             cls = "pane active" if i == 0 else "pane"
             parts.append(f'<div class="{cls}" data-cat="{esc(cat)}">')
-            parts.extend(render_source_section(g) for g in buckets[cat])
+            for g in buckets[cat]:
+                if g.get("long"):
+                    # 自選內容：扁平的長卡片清單，不按來源分組、不加來源標題。
+                    parts.append('<section class="longsec">'
+                                 + "".join(render_long_item(it) for it in g["items"])
+                                 + '</section>')
+                else:
+                    parts.append(render_source_section(g))
             parts.append('</div>')
 
     if archive_links:
@@ -459,5 +698,11 @@ def write_outputs(groups: list[dict], seed_mode: bool, brief: dict | None = None
 
 if __name__ == "__main__":
     groups, seed_mode = collect()
+    # 種子模式（第一次跑）跳過 inbox，維持「第一次不燒 token」的設計。
+    inbox_group, processed = (None, []) if seed_mode else collect_inbox()
+    if inbox_group:
+        groups = groups + [inbox_group]
     brief = None if seed_mode else generate_brief(groups)
     write_outputs(groups, seed_mode, brief)
+    if not seed_mode:
+        archive_processed_inbox(processed)

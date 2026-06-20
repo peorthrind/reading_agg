@@ -15,13 +15,24 @@
    ├─ 讀 sources.json 的來源，抓各家 RSS
    ├─ 跟 data/seen.json 比對，挑出「上次之後新增」的文章
    ├─ 每篇新文章 → Claude (Haiku) 產生 英文 summary + 中文標題/摘要
-   ├─ 當天所有新文 → Claude (Sonnet) 產生 開場白 + 今日精選 Top 5
+   ├─ 讀 inbox/ 裡手動丟進來的全文 → Claude (Sonnet) 產生 結構化長摘要（見下）
+   ├─ 當天所有新文（含自選內容）→ Claude (Sonnet) 產生 開場白 + 今日精選 Top 5
    ├─ 輸出 public/index.html（最新）+ public/archive/日期.html（存檔）
+   ├─ 把處理過的 inbox 檔搬到 processed/<日期>/，id 記進 data/inbox_seen.json
    └─ commit 回 repo，並部署到 GitHub Pages
 ```
 
-- **第一次執行 = 種子模式**：只記錄目前各來源文章為基準線，不摘要、不花 token。隔天起才會出現「新增」內容。
-- **成本**：逐篇摘要用 Haiku（每天幾十篇 × ~400 tokens），每日精選用 Sonnet（一天一次，~2 美分）。合計一個月大約 **一兩美金**。模型可在 `aggregate.py` 的 `MODEL` / `BRIEF_MODEL` 調整。
+- **第一次執行 = 種子模式**：只記錄目前各來源文章為基準線，不摘要、不花 token（也跳過 inbox）。隔天起才會出現「新增」內容。
+- **成本**：逐篇摘要用 Haiku（每天幾十篇 × ~400 tokens），每日精選用 Sonnet（一天一次，~2 美分）。合計一個月大約 **一兩美金**。模型可在 `aggregate.py` 的 `MODEL` / `BRIEF_MODEL` / `LONG_MODEL` 調整。
+
+### 自選內容（手動丟連結 → 長摘要）
+
+另一條平行管道：把想精讀的文章/影片連結，由攝取端（另一個 repo）煮成全文、寫成 `inbox/*.json`（格式契約見 `docs/ingestion_handoff.md`）。每天彙整時會：
+
+- 讀 `inbox/`，每篇用 **Sonnet** 吃全文，產出結構化長摘要（一句話、重點清單、依原文約 1/5 長度的分段摘要、為何值得讀）。
+- 渲染進**第一個頁籤「自選內容」**，用比 RSS 更豐富的長卡片（左側 accent 條、📺/📄 圖示、來源/時長）。
+- `full_text` 設 4 萬字上限當成本保險絲（中文最壞 ≈ ≤40k token ≈ ≤$0.12 input/篇）；20 分鐘知識型影片實測單篇約 **$0.05**。
+- 處理完把 inbox 檔搬到 `processed/<日期>/` 備查，靠 `data/inbox_seen.json` 跨天去重。
 
 ---
 
@@ -89,6 +100,9 @@ open public/index.html                  # 打開看結果
 | `aggregate.py` | 主程式：抓 feed → 比對新文 → Claude 摘要 → 產生 HTML |
 | `.github/workflows/digest.yml` | 排程與部署（cron 時間在這裡改） |
 | `data/seen.json` | 已看過的文章記錄（自動產生/維護，保留近 60 天） |
+| `inbox/` | 攝取端丟進來、待長摘要的全文 `*.json`（格式契約見 `docs/ingestion_handoff.md`） |
+| `processed/<日期>/` | 已長摘要、搬離 inbox 的檔（備查，自動產生） |
+| `data/inbox_seen.json` | 自選內容跨天去重記錄（自動產生/維護，保留近 60 天） |
 | `public/` | 產出的網頁（自動產生，由 Pages 部署） |
 
 ---
