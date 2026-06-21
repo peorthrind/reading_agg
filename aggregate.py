@@ -134,17 +134,12 @@ def make_long_enricher():
         "properties": {
             "zh_title": {"type": "string", "description": "繁體中文標題"},
             "one_liner": {"type": "string", "description": "一句話：這篇／這片在講什麼"},
-            "key_points": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "幾個重點，每點含具體內容（論點／數據／例子），不是只寫話題",
-            },
             "summary": {"type": "string", "description":
                 "依原文約 1/5 長度的繁中長摘要；原文很長時用分主題小節（段落以空行分隔），"
                 "保留具體論點、數據、例子與結論，不是逐段翻譯也不是一句帶過"},
             "worth_reading": {"type": "string", "description": "一句：為什麼值得花時間讀全文／看全片"},
         },
-        "required": ["zh_title", "one_liner", "key_points", "summary", "worth_reading"],
+        "required": ["zh_title", "one_liner", "summary", "worth_reading"],
         "additionalProperties": False,
     }
 
@@ -400,7 +395,6 @@ def collect_inbox() -> tuple[dict | None, list[tuple]]:
             "source": d["source"],
             "type": d["type"],
             "one_liner": enriched.get("one_liner", ""),
-            "key_points": enriched.get("key_points", []),
             "summary": enriched.get("summary", ""),
             "worth_reading": enriched.get("worth_reading", ""),
             "duration_seconds": meta.get("duration_seconds"),
@@ -499,12 +493,10 @@ footer a { color:var(--accent); }
 .longitem .lt-head a:hover .lt-title { text-decoration:underline; }
 .longitem .lt-meta { color:var(--sub); font-size:.85rem; margin-top:4px; }
 .longitem .lt-oneliner { font-size:1rem; margin:12px 0 0; }
-.longitem .lt-points { margin:12px 0 0; padding-left:1.2em; }
-.longitem .lt-points li { margin-bottom:5px; }
+.longitem .lt-worth { margin:14px 0 4px; padding:8px 12px; border-left:2px solid var(--accent);
+  font-size:.92rem; color:var(--ink); }
 .longitem .lt-summary { margin-top:6px; }
 .longitem .lt-summary p { margin:10px 0; font-size:.95rem; }
-.longitem .lt-worth { margin-top:14px; padding-top:12px; border-top:1px solid var(--line);
-  font-size:.92rem; color:var(--sub); }
 """
 
 TAB_JS = """
@@ -561,7 +553,7 @@ def render_source_section(g: dict) -> str:
 
 
 def render_long_item(it: dict) -> str:
-    """自選內容的長卡片：圖示＋標題＋來源/時長 meta → 引言 → 重點清單 → 多段摘要 → 收尾。"""
+    """自選內容的長卡片：圖示＋標題＋來源/時長 meta → 引言 → 值得讀 → 多段摘要。"""
     zh_t = esc(it["zh_title"]) or esc(it["en_title"])
     icon = "📺" if it.get("type") == "youtube" else "📄"
     meta_bits = [esc(it.get("source", ""))]
@@ -578,18 +570,13 @@ def render_long_item(it: dict) -> str:
            f'<div class="lt-meta">{meta}</div></div>']
     if it.get("one_liner"):
         out.append(f'<div class="lt-oneliner">{esc(it["one_liner"])}</div>')
-    pts = [p for p in (it.get("key_points") or []) if p]
-    if pts:
-        out.append('<ul class="lt-points">')
-        out.extend(f'<li>{esc(p)}</li>' for p in pts)
-        out.append('</ul>')
+    if it.get("worth_reading"):
+        out.append(f'<div class="lt-worth">💡 值得讀：{esc(it["worth_reading"])}</div>')
     if it.get("summary"):
         paras = [seg.strip() for seg in re.split(r"\n\s*\n", it["summary"]) if seg.strip()]
         out.append('<div class="lt-summary">')
         out.extend(f'<p>{esc(para)}</p>' for para in paras)
         out.append('</div>')
-    if it.get("worth_reading"):
-        out.append(f'<div class="lt-worth">💡 值得讀：{esc(it["worth_reading"])}</div>')
     out.append('</div>')
     return "".join(out)
 
