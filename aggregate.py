@@ -44,9 +44,9 @@ INBOX_SEEN_FILE = ROOT / "data" / "inbox_seen.json"
 INBOX_SCHEMA_VERSION = 1
 INBOX_CATEGORY = "自選內容"
 
-# 頁籤顯示順序。「自選內容」排第一（手動精選）；其餘對應 sources.json 的 category。
-# 沒對到這份清單的分類，會排在最後（歸到「其他」）。
-CATEGORY_ORDER = [INBOX_CATEGORY, "科技 / AI", "新聞 / 時事", "長文 / 評論"]
+# 頁籤顯示順序。先列自動聚合的 category，「自選內容」（手動精選）排最後。
+# 沒對到這份清單的分類，會接在這份清單之後（即「自選內容」後面），「其他」墊底。
+CATEGORY_ORDER = ["科技 / AI", "新聞 / 時事", "長文 / 評論", INBOX_CATEGORY]
 DEFAULT_CATEGORY = "其他"
 
 
@@ -191,7 +191,10 @@ def generate_brief(groups: list[dict]) -> dict | None:
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         return None
-    flat = [{**it, "source": g["name"]} for g in groups for it in g["items"]]
+    # 自選內容是手動精選，不參與今日精選評選（不跟自動聚合的文章搶名額）。
+    flat = [{**it, "source": g["name"]}
+            for g in groups if g.get("category") != INBOX_CATEGORY
+            for it in g["items"]]
     if not flat:
         return None
 
@@ -387,7 +390,7 @@ def collect_inbox() -> tuple[dict | None, list[tuple]]:
             continue  # 失敗就留著（不搬、不記 seen），下次再試
         meta = d.get("meta") or {}
         items.append({
-            # generate_brief 相容欄位（讓自選內容也能被選進今日精選）
+            # 共用欄位（長卡片渲染用；自選內容不參與今日精選評選，見 generate_brief）
             "en_title": d["title"],
             "zh_title": enriched.get("zh_title", ""),
             "zh_summary": enriched.get("one_liner", ""),
