@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "d31ff574",
+  "url": "https://x.com/Xudong07452910/status/2069274246740598946",
+  "type": "article",
+  "title": "Xudong Han (@Xudong07452910) on X",
+  "source": "Xudong Han",
+  "full_text": "最近读到一篇很喜欢的文章：Zen and the Art of AI Research。\n它最打动我的观点是：\n做 AI research，很多时候拼的不是天赋，而是一种研究气质。\n能不能长期泡在一个问题里，能不能接受实验失败和对好的结果保持怀疑，能不能在别人发了好 paper 之后，不只是焦虑，而是反过来问自己：我有没有在同样的深度上思考？\n文章里有个很好的类比：做研究有点像打坐。\n有灵感的时候，继续坐。\n没有灵感的时候，也继续坐。\n很多真正重要的想法，不是刷几篇热门论文就突然冒出来的，而是在反复阅读、动手构建、失败、debug、重新理解里慢慢长出来的。\n这篇文章还提醒了一个很现实的问题：coding agents 会让研究跑得更快，但也会让人更容易失去对系统细节的掌控。\n它可能帮你改了 prompt，缩短了 sequence length，换了 config，跑了一个看起来差不多、其实已经不一样的实验。\n工程上这可能只是小问题，科研上就是大问题。\n因为一个很小的改动，就可能改变整篇论文的结论。\n所以 AI 时代的研究能力会变得更矛盾：\n你要会用 AI 加速，但不能把理解外包给 AI。\n你要跑得更快，但不能失去慢下来检查的能力。\n你要拥抱 agents，但仍然要知道每个结果是怎么来的。\n优秀的研究者需要在工具越来越强之后，依然能保持耐心、怀疑和清醒的人。\nblog.jxmo.io/p/zen-and-the-…",
+  "lang": "",
+  "added_at": "2026-06-24T05:20:20Z",
+  "added_by": "peorthrind",
+  "note": "",
+  "meta": {
+    "word_count": 436,
+    "duration_seconds": null,
+    "transcript_source": null
+  }
+}
