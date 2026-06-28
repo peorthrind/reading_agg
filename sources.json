@@ -21,6 +21,8 @@
     { "name": "Foreign Affairs (via Google News)", "category": "新聞 / 時事", "url": "https://news.google.com/rss/search?q=site:foreignaffairs.com+when:14d&hl=en-US&gl=US&ceid=US:en", "enabled": true },
 
     { "name": "The Atlantic", "category": "長文 / 評論", "url": "https://www.theatlantic.com/feed/all/", "enabled": true },
+    { "name": "The Dispatch", "category": "長文 / 評論", "url": "https://thedispatch.com/feed/", "enabled": true },
+    { "name": "The Free Press", "category": "長文 / 評論", "url": "https://thefp.com/feed", "enabled": true },
     { "name": "Harper's Magazine", "category": "長文 / 評論", "url": "https://harpers.org/feed/", "enabled": true },
     { "name": "London Review of Books", "category": "長文 / 評論", "url": "https://www.lrb.co.uk/feeds/rss", "enabled": true },
     { "name": "n+1", "category": "長文 / 評論", "url": "https://www.nplusonemag.com/feed/", "enabled": true },
