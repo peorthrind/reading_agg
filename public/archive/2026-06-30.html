@@ -80,7 +80,7 @@ GPT-4 等專有 LLM 效能卓越，但推理成本高、僅能透過 API 存取�
 - 代理不做 DPO 對齊 → BBH -10.40、GSM8K -5.53、MMLU -3.26
 - 拿掉加權 KL → 多數基準下滑
 - 代理從 70B 換成 13B → 學生表現全面下降，且 70B 代理展現更大的學生提升潛力</p><p>**結論與限制**
-Proxy-KD 將黑盒教師的高品質輸出與白盒蒸餾的分布資訊兩者結合，同時透過 DPO 對齊縮小代理與教師間的差距，並以樣本加權進一步過濾低品質對齊。限制包括：代理對齊的訓練開銷大（尤其 70B 級別）、DPO 需線上採樣增加時間成本，以及實驗僅涵蓋 Llama 系列，未測試 Qwen、Mistral 等其他架構。</p><p>（基於前段內容）</p></div></div></section></div><footer>往期存檔：<a href="archive/2026-06-30.html">2026-06-30</a> · <a href="archive/2026-06-29.html">2026-06-29</a> · <a href="archive/2026-06-28.html">2026-06-28</a> · <a href="archive/2026-06-27.html">2026-06-27</a> · <a href="archive/2026-06-26.html">2026-06-26</a> · <a href="archive/2026-06-25.html">2026-06-25</a> · <a href="archive/2026-06-24.html">2026-06-24</a> · <a href="archive/2026-06-23.html">2026-06-23</a> · <a href="archive/2026-06-22.html">2026-06-22</a> · <a href="archive/2026-06-21.html">2026-06-21</a> · <a href="archive/2026-06-20.html">2026-06-20</a> · <a href="archive/2026-06-19.html">2026-06-19</a> · <a href="archive/2026-06-18.html">2026-06-18</a> · <a href="archive/2026-06-17.html">2026-06-17</a> · <a href="archive/2026-06-16.html">2026-06-16</a> · <a href="archive/2026-06-15.html">2026-06-15</a> · <a href="archive/2026-06-14.html">2026-06-14</a> · <a href="archive/2026-06-13.html">2026-06-13</a> · <a href="archive/2026-06-12.html">2026-06-12</a></footer></div>
+Proxy-KD 將黑盒教師的高品質輸出與白盒蒸餾的分布資訊兩者結合，同時透過 DPO 對齊縮小代理與教師間的差距，並以樣本加權進一步過濾低品質對齊。限制包括：代理對齊的訓練開銷大（尤其 70B 級別）、DPO 需線上採樣增加時間成本，以及實驗僅涵蓋 Llama 系列，未測試 Qwen、Mistral 等其他架構。</p><p>（基於前段內容）</p></div></div></section></div><footer>由 reading_agg 自動產生。</footer></div>
 <script>
 document.querySelectorAll('.tabs button').forEach(function(btn){
   btn.addEventListener('click', function(){
