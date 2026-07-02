@@ -30,6 +30,7 @@
     { "name": "Delayed Gratification", "category": "長文 / 評論", "url": "https://www.slow-journalism.com/feed/", "enabled": true },
     { "name": "Slow Boring (Matt Yglesias)", "category": "長文 / 評論", "url": "https://www.slowboring.com/feed", "enabled": true },
     { "name": "Noahpinion (Noah Smith)", "category": "長文 / 評論", "url": "https://www.noahpinion.blog/feed", "enabled": true },
+    { "name": "Silver Bulletin (Nate Silver)", "category": "長文 / 評論", "url": "https://www.natesilver.net/feed", "enabled": true },
     { "name": "Doomberg", "category": "長文 / 評論", "url": "https://doomberg.substack.com/feed", "enabled": true },
     { "name": "Works in Progress", "category": "長文 / 評論", "url": "https://worksinprogress.substack.com/feed", "enabled": true },
     { "name": "The Honest Broker (Ted Gioia)", "category": "長文 / 評論", "url": "https://www.honest-broker.com/feed", "enabled": true },
