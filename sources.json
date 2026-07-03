@@ -24,7 +24,6 @@
     { "name": "The Dispatch", "category": "長文 / 評論", "url": "https://thedispatch.com/feed/", "enabled": true },
     { "name": "The Free Press", "category": "長文 / 評論", "url": "https://thefp.com/feed", "enabled": true },
     { "name": "Harper's Magazine", "category": "長文 / 評論", "url": "https://harpers.org/feed/", "enabled": true },
-    { "name": "London Review of Books", "category": "長文 / 評論", "url": "https://www.lrb.co.uk/feeds/rss", "enabled": true },
     { "name": "n+1", "category": "長文 / 評論", "url": "https://www.nplusonemag.com/feed/", "enabled": true },
     { "name": "1843 Magazine", "category": "長文 / 評論", "url": "https://www.economist.com/1843/rss.xml", "enabled": true },
     { "name": "Delayed Gratification", "category": "長文 / 評論", "url": "https://www.slow-journalism.com/feed/", "enabled": true },
