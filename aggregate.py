@@ -49,6 +49,16 @@ INBOX_CATEGORY = "自選內容"
 CATEGORY_ORDER = ["科技 / AI", "新聞 / 時事", "長文 / 評論", INBOX_CATEGORY]
 DEFAULT_CATEGORY = "其他"
 
+# 所有中文輸出的統一風格要求：一律用台灣慣用的繁體中文與詞彙，避免支語（中國大陸用語）。
+# 附幾個常見對照當作校準錨點，逐篇摘要用的是便宜模型，具體例子最有幫助。
+ZH_STYLE = (
+    "所有中文一律使用台灣慣用的繁體中文用字與詞彙，避免中國大陸慣用語（支語）。"
+    "例如：「資訊」而非「信息」、「影片」而非「視頻」、「軟體」而非「軟件」、"
+    "「螢幕」而非「屏幕」、「預設」而非「默認」、「伺服器」而非「服務器」、"
+    "「人工智慧」而非「人工智能」、「使用者」而非「用戶」、「透過」而非「通過」、"
+    "「品質」而非「質量」、「網路」而非「網絡」、「記憶體」而非「內存」、「晶片」而非「芯片」。"
+)
+
 
 # ---------------------------------------------------------------- 工具
 def today_str() -> str:
@@ -100,6 +110,7 @@ def make_enricher():
             "- en_summary: one concise English sentence on the article's topic\n"
             "- zh_title: the title translated into Traditional Chinese\n"
             "- zh_summary: one Traditional-Chinese sentence on what it's about\n\n"
+            f"中文風格要求：{ZH_STYLE}\n\n"
             f"Title: {title}\n"
             f"Excerpt: {summary or '(none)'}"
         )
@@ -152,7 +163,8 @@ def make_long_enricher():
         note = item.get("note") or ""
         prompt = (
             "你在為一份個人精讀摘要做『深度筆記』，讀者是丟這篇連結進來的人本人，"
-            "目的是讓他不必讀完全文／看完整片，也能真正吸收裡面的論點與資訊。請用繁體中文。\n\n"
+            "目的是讓他不必讀完全文／看完整片，也能真正吸收裡面的論點與資訊。\n"
+            f"{ZH_STYLE}\n\n"
             f"來源類型：{kind}\n"
             f"標題：{item.get('title', '')}\n"
             f"來源：{item.get('source', '')}\n"
@@ -223,7 +235,8 @@ def generate_brief(groups: list[dict]) -> dict | None:
         "additionalProperties": False,
     }
     prompt = (
-        f"以下是今天新增的 {len(flat)} 篇文章（編號 (來源) 標題 — 摘要）。請用繁體中文：\n"
+        f"以下是今天新增的 {len(flat)} 篇文章（編號 (來源) 標題 — 摘要）。\n"
+        f"{ZH_STYLE}\n"
         f"1. intro：寫 2–3 句『今天的大局』開場白，綜合最重要的脈絡，不要逐條流水帳。\n"
         f"2. top5：挑出最值得讀的 {n_pick} 篇（給編號），每篇一句說明為什麼值得讀。"
         f"偏好有觀點、有深度、跨主題的內容，盡量不要全挑同一個來源。\n\n"
