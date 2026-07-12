@@ -18,7 +18,9 @@ import html
 import json
 import os
 import re
+import urllib.request
 from pathlib import Path
+from types import SimpleNamespace
 
 import feedparser
 
@@ -79,6 +81,47 @@ def clean_text(s: str, limit: int = 600) -> str:
     s = html.unescape(s)
     s = re.sub(r"\s+", " ", s).strip()
     return s[:limit]
+
+
+# ------------------------------------------------------------- HackMD 特例來源
+HACKMD_LIMIT = 30  # HackMD 沒有 RSS，改打 overview JSON API；每次最多取「最新這麼多篇」
+
+
+def fetch_hackmd_entries(page_url: str, limit: int = HACKMD_LIMIT):
+    """HackMD 使用者頁面沒有 RSS/Atom，改打公開的 overview JSON API，
+    把公開筆記包成 feedparser 風格的 entry（有 .id/.title/.summary/.link），
+    好讓後面的去重、per-source 上限、Claude 摘要全部沿用不用改。
+    API 一次回全部筆記，這裡按發布時間新→舊排序後只取最新 limit 篇，
+    避免第一次加來源時一口氣把好幾百篇當新文灌進來。
+    抓不到就回空 list，跟 feed 掛掉時的行為一致。"""
+    m = re.search(r"@([\w-]+)", page_url)
+    if not m:
+        print(f"   ⚠ 認不出 HackMD userpath：{page_url}")
+        return []
+    userpath = m.group(1)
+    api = f"https://hackmd.io/api/@{userpath}/overview"
+    req = urllib.request.Request(api, headers={
+        "User-Agent": "Mozilla/5.0 (reading_agg)",
+        "Accept": "application/json",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        print(f"   ⚠ HackMD API 抓取失敗：{exc}")
+        return []
+    notes = data.get("notes") or []
+    notes.sort(key=lambda n: n.get("publishedAt") or "", reverse=True)
+    entries = []
+    for n in notes[:limit]:
+        sid = n.get("shortId") or ""
+        entries.append(SimpleNamespace(
+            id=sid,
+            title=n.get("title") or "",
+            summary=n.get("content") or "",  # 筆記首段本身就是摘要，clean_text 會壓成純文字
+            link=f"https://hackmd.io/@{userpath}/{sid}",
+        ))
+    return entries
 
 
 # ---------------------------------------------------------------- Claude 摘要
@@ -309,14 +352,17 @@ def collect() -> tuple[list[dict], bool]:
         if not src.get("enabled", True):
             continue
         print(f"→ {src['name']}")
-        feed = feedparser.parse(src["url"])
-        new_entries = [e for e in feed.entries if item_id(e) not in seen]
+        if src.get("type") == "hackmd":
+            entries = fetch_hackmd_entries(src["url"], src.get("limit", HACKMD_LIMIT))
+        else:
+            entries = feedparser.parse(src["url"]).entries
+        new_entries = [e for e in entries if item_id(e) not in seen]
         # 標記全部為已看（包含種子模式下的所有文章）
-        for e in feed.entries:
+        for e in entries:
             seen.setdefault(item_id(e), today)
 
         if seed_mode:
-            print(f"   種子模式：記錄 {len(feed.entries)} 篇為已看，不摘要。")
+            print(f"   種子模式：記錄 {len(entries)} 篇為已看，不摘要。")
             continue
 
         # 來源層級過濾：只保留連結含 include_link_substr 的文章。

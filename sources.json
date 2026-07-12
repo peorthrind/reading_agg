@@ -1,5 +1,5 @@
 {
-  "_comment": "你的閱讀來源。category 決定它出現在哪個頁籤（科技 / AI、新聞 / 時事、長文 / 評論）；想換頁籤就改 category。enabled:false 會被跳過。",
+  "_comment": "你的閱讀來源。category 決定它出現在哪個頁籤（科技 / AI、新聞 / 時事、長文 / 評論）；想換頁籤就改 category。enabled:false 會被跳過。一般來源 url 要是 RSS/Atom feed；HackMD 使用者頁沒有 feed，用 type:hackmd + 使用者頁網址，會改打 overview JSON API（可用 limit 調每次取幾篇最新，預設 30）。",
   "sources": [
     { "name": "TechCrunch", "category": "科技 / AI", "url": "https://techcrunch.com/feed/", "enabled": true },
     { "name": "MIT Technology Review", "category": "科技 / AI", "url": "https://www.technologyreview.com/feed/", "enabled": true },
@@ -10,6 +10,7 @@
     { "name": "InfoQ 中文", "category": "科技 / AI", "url": "https://www.infoq.cn/feed", "enabled": true },
     { "name": "Hacker News 首頁", "category": "科技 / AI", "url": "https://hnrss.org/frontpage", "enabled": true },
     { "name": "Rest of World", "category": "科技 / AI", "url": "https://restofworld.org/feed/latest/", "enabled": true },
+    { "name": "停損王SLKing (HackMD)", "category": "科技 / AI", "type": "hackmd", "url": "https://hackmd.io/@JbhlYkBtRJukuvsXMtL6lg", "enabled": true },
     { "name": "Quartz", "category": "科技 / AI", "url": "https://qz.com/rss", "enabled": false },
 
     { "name": "The Economist — Latest", "category": "新聞 / 時事", "url": "https://www.economist.com/latest/rss.xml", "enabled": true },
