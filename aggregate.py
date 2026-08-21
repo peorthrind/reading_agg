@@ -355,7 +355,11 @@ def collect() -> tuple[list[dict], bool]:
         if src.get("type") == "hackmd":
             entries = fetch_hackmd_entries(src["url"], src.get("limit", HACKMD_LIMIT))
         else:
-            entries = feedparser.parse(src["url"]).entries
+            try:
+                entries = feedparser.parse(src["url"]).entries
+            except Exception as exc:  # noqa: BLE001
+                print(f"   ⚠ RSS 抓取失敗：{exc}")
+                entries = []
         new_entries = [e for e in entries if item_id(e) not in seen]
         # 標記全部為已看（包含種子模式下的所有文章）
         for e in entries:
