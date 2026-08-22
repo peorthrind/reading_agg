@@ -34,6 +34,8 @@
     { "name": "Doomberg", "category": "長文 / 評論", "url": "https://doomberg.substack.com/feed", "enabled": true },
     { "name": "Works in Progress", "category": "長文 / 評論", "url": "https://worksinprogress.substack.com/feed", "enabled": true },
     { "name": "The Honest Broker (Ted Gioia)", "category": "長文 / 評論", "url": "https://www.honest-broker.com/feed", "enabled": true },
-    { "name": "阮一峰 科技愛好者週刊", "category": "長文 / 評論", "url": "https://www.ruanyifeng.com/blog/atom.xml", "enabled": true }
+    { "name": "阮一峰 科技愛好者週刊", "category": "長文 / 評論", "url": "https://www.ruanyifeng.com/blog/atom.xml", "enabled": true },
+    { "name": "Singal-Minded (Jesse Singal)", "category": "長文 / 評論", "url": "https://jessesingal.substack.com/feed", "enabled": true },
+    { "name": "Blocked and Reported", "category": "長文 / 評論", "url": "https://www.blockedandreported.org/feed", "enabled": true }
   ]
 }
