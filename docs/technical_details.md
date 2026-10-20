@@ -66,11 +66,11 @@ def item_id(entry):
     raw = entry.id or entry.link or entry.title   # 優先用 feed 的 guid
     return hashlib.sha1(raw.encode()).hexdigest()
 ```
-`data/seen.json` 是 `{ 文章ID: 第一次看到的日期 }`。每次執行：feed 裡 ID 不在 seen 的 = 新文章。
+`data/seen.json` 是 `{ 文章ID: 最後一次在 feed 裡看到的日期 }`。每次執行：feed 裡 ID 不在 seen 的 = 新文章。
 
 - **為什麼用 ID 比對，而不是「抓最近 24 小時」**：時間窗的做法在「某天 workflow 失敗沒跑」時會漏文章，或重複顯示。用 seen 記錄就天然冪等（idempotent）——跑幾次結果都對。
 - **為什麼 ID 要 hash**：feed 的 guid/link 可能很長、含奇怪字元，hash 成固定長度當 key 乾淨。
-- **防無限長大**：`save_seen()` 只保留近 60 天的記錄（`SEEN_RETENTION_DAYS`）。文章不會在 feed 裡待超過這麼久，舊記錄可以丟。
+- **防無限長大**：`save_seen()` 只保留近 60 天的記錄（`SEEN_RETENTION_DAYS`）。文章只要還在 feed 裡，每次執行都會把日期刷新成當天，所以只有已經從 feed 消失超過 60 天的記錄才會被丟。（早期用 `setdefault` 只記第一次看到的日期，更新慢的 feed——例如 PerThirtySix 一次列半年——文章待超過 60 天後記錄被清掉，就會被當成新文章重新出現。）
 
 ### (b) 種子模式（seed mode）
 第一次跑時 seen.json 不存在 → 把目前所有文章標記為已看，**但不摘要、不花 token**。

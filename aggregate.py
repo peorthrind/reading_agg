@@ -361,9 +361,11 @@ def collect() -> tuple[list[dict], bool]:
                 print(f"   ⚠ RSS 抓取失敗：{exc}")
                 entries = []
         new_entries = [e for e in entries if item_id(e) not in seen]
-        # 標記全部為已看（包含種子模式下的所有文章）
+        # 標記全部為已看（包含種子模式下的所有文章）。
+        # 日期記「最後一次還在 feed 裡」而非第一次看到：更新慢的 feed 會把文章留超過
+        # SEEN_RETENTION_DAYS，若不刷新，記錄被清掉後舊文會被當成新文章再冒出來。
         for e in entries:
-            seen.setdefault(item_id(e), today)
+            seen[item_id(e)] = today
 
         if seed_mode:
             print(f"   種子模式：記錄 {len(entries)} 篇為已看，不摘要。")
