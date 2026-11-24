@@ -4,7 +4,12 @@ on:
   schedule:
     # 23:00 UTC = 隔天早上 07:00 台北時間。想改時間就改這行（用 UTC）。
     - cron: "0 23 * * *"
-  workflow_dispatch: {}   # 也允許在 Actions 頁面手動觸發（用來測試）
+  workflow_dispatch:      # 也允許在 Actions 頁面手動觸發（用來測試）
+    inputs:
+      deploy_only:
+        description: "只重新部署 repo 裡現有的 public/（跳過抓取、摘要、commit）。部署步驟失敗時用，避免重跑 aggregate 把當期蓋成空頁。"
+        type: boolean
+        default: false
 
 # 讓 workflow 能：把 seen.json/public 推回 repo、部署到 Pages
 permissions:
@@ -31,14 +36,17 @@ jobs:
           python-version: "3.12"
 
       - name: Install deps
+        if: ${{ !inputs.deploy_only }}
         run: pip install -r requirements.txt
 
       - name: Build digest
+        if: ${{ !inputs.deploy_only }}
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python aggregate.py
 
       - name: Commit state & output back to repo
+        if: ${{ !inputs.deploy_only }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
