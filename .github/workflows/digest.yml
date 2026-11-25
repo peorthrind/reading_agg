@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy_retry.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -70,6 +70,19 @@ jobs:
         with:
           path: public
 
+      # upload 剛 finalize 後立刻查 artifact 清單，GitHub 端偶爾還查不到
+      # （"No artifacts named github-pages"，2026-11-24/25 連兩天）。
+      # 第一次失敗就等一下再部署一次，而不是整個 job 掛掉。
       - name: Deploy to GitHub Pages
         id: deploy
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Wait for artifact to become visible
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 30
+
+      - name: Deploy to GitHub Pages (retry)
+        id: deploy_retry
+        if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
